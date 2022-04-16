@@ -46,7 +46,7 @@ def ANN_validate(X,y,h_list,cvf=10):
     # Parameters for neural network classifier
 
     n_replicates = 1        # number of networks trained in each k-fold
-    max_iter = 10000
+    max_iter = 30000
     errors= np.empty((cvf, len(h_list)))
     for k, (train_index, test_index) in enumerate(CV.split(X, y)):
         print('\nCrossvalidation fold (inner): {0}/{1}'.format(k+1,cvf)) 
