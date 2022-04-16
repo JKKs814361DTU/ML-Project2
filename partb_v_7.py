@@ -74,7 +74,7 @@ loss_fn = torch.nn.MSELoss() # notice how this is now a mean-squared-error loss
  
 errors = [] # make a list for storing generalizaition error in each loop 
 h_unit = [] 
-opt_val_E = [] 
+
 Error_train_rlr = np.empty((K,1)) 
 Error_test_rlr = np.empty((K,1)) 
 Error_train_nofeatures = np.empty((K,1)) 
@@ -95,25 +95,30 @@ for (k, (train_index, test_index)) in enumerate(CV.split(X,y)):
     # Compute mean squared error without using the input data at all 
     Error_train_nofeatures[k] = np.square(y_train-y_train.mean()).sum(axis=0)/y_train.shape[0] 
     Error_test_nofeatures[k] = np.square(y_test-y_test.mean()).sum(axis=0)/y_test.shape[0] 
-    y_baseline= np.append(y_baseline, np.ones(len(y_test))*y_test.mean())
-    y_True =np.append(y_True,y_test)
+    
+    y_baseline= np.append(y_baseline, np.ones(len(y_test))*y_test.mean()) #Baseline prediction
+    
+    y_True =np.append(y_True,y_test) #True test values
     
     #################################Regularized linear reg################################## 
     X_train = (X_rlr[train_index,:])
     X_test_rlr = (X_rlr[test_index,:]) 
+    
+    #Find the optimal lambda
     opt_val_err_rlr, opt_lambda, mean_w_vs_lambda, train_err_vs_lambda, test_err_vs_lambda = rlr_validate(X_train, y_train, lambdas, K) 
-    Table[k,3] = opt_lambda 
-    #Table[:,4] = opt_val_err_rlr 
+    
+    Table[k,3] = opt_lambda #save opt lambda in table
     # Estimate weights for the optimal value of lambda, on entire training set 
     lambdaI = opt_lambda * np.eye(M+1)
     lambdaI[0,0] = 0 # Do no regularize the bias term 
     Xty = X_train.T @ y_train 
     XtX = X_train.T @ X_train 
-    w_rlr[:,k] = np.linalg.solve(XtX+lambdaI,Xty).squeeze() 
+    w_rlr[:,k] = np.linalg.solve(XtX+lambdaI,Xty).squeeze()  #find weights
+    
     # Compute mean squared error with regularization with optimal lambda 
     Error_train_rlr[k] = np.square(y_train-X_train @ w_rlr[:,k]).sum(axis=0)/y_train.shape[0] 
     Error_test_rlr[k] = np.square(y_test-X_test_rlr @ w_rlr[:,k]).sum(axis=0)/y_test.shape[0] 
-    y_rlr = np.append(y_rlr,X_test_rlr @ w_rlr[:,k]) 
+    y_rlr = np.append(y_rlr,X_test_rlr @ w_rlr[:,k]) #rlr prediction test 
     ################################ANN########################################
     # Extract training and test set for current CV fold, convert to tensors 
     X_train = torch.Tensor(X[train_index,:]) 
@@ -121,11 +126,11 @@ for (k, (train_index, test_index)) in enumerate(CV.split(X,y)):
     X_test = torch.Tensor(X[test_index,:]) 
     y_test = torch.Tensor(y[test_index]) 
     
-    print("####################OPTIMIZING HIDEN UNITS##########################") 
-    opt_val_err, n_hidden_units = ANN_validate(X_test,y_test,[6,7,8,9,10],cvf=K) 
-    h_unit.append(n_hidden_units) 
-    #opt_val_E.append(opt_val_err) 
-    #print(n_hidden_units) 
+    print("####################OPTIMIZING HIDEN UNITS##########################")
+    # find optimal value of hiden units
+    opt_val_err, n_hidden_units = ANN_validate(X_test,y_test,[6,7,8,9,10],cvf=K)
+    h_unit.append(n_hidden_units) #update optimal number o units
+    
     # Define the model 
     model = lambda: torch.nn.Sequential( 
                         torch.nn.Linear(M, n_hidden_units), #M features to n_hidden_units 
@@ -150,10 +155,9 @@ for (k, (train_index, test_index)) in enumerate(CV.split(X,y)):
      
     # Determine errors and errors 
     se = (y_test_est.float()-y_test.float())**2 # squared error 
-    y_ANN = np.append(y_ANN,y_test_est.data.numpy())
+    y_ANN = np.append(y_ANN,y_test_est.data.numpy()) # ANN prediction
     mse = (sum(se).type(torch.float)/len(y_test)).data.numpy() #mean 
     errors.append(mse) # store error rate for current CV fold  
-    opt_val_E.append(mse) 
     # Display the learning curve for the best net in the current fold 
     h, = summaries_axes[0].plot(learning_curve, color=color_list[k]) 
     h.set_label('CV fold {0}'.format(k+1)) 
@@ -211,7 +215,7 @@ summaries_axes[0].set_ylabel('Optimal no of units')
 summaries_axes[0].set_title('Optimal no of units') 
  
 # Display the Optimal units across folds 
-summaries_axes[1].bar(np.arange(1, K+1), np.squeeze(np.asarray(opt_val_E)), color=color_list) 
+summaries_axes[1].bar(np.arange(1, K+1), np.squeeze(np.asarray(errors)), color=color_list) 
 summaries_axes[1].set_xlabel('Fold') 
 summaries_axes[1].set_xticks(np.arange(1, K+1)) 
 summaries_axes[1].set_ylabel('Avg error for CV fold') 
@@ -223,12 +227,12 @@ summaries_axes[1].set_title('ANN')
  
  
 #############################Create the table################################# 
- 
+#%%
  
 Table[:,0] = np.arange(K) 
 Table[:,1] = h_unit 
 Table[:,2] = errors
-Table[:,4] = Error_test_rlr
+Table[:,4] = Error_test_rlr[:,0]
 Table[:,5] = Error_test_nofeatures[:,0] 
  
 #############################Statistics#######################################
