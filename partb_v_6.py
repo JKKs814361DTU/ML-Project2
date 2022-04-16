@@ -48,7 +48,7 @@ X = stats.zscore(X)
 N, M = X.shape 
  
 # K-fold crossvalidation 
-K = 2                   # only three folds to speed up this example 
+K = 10                   # only three folds to speed up this example 
 CV = model_selection.KFold(K, shuffle=True) 
  
 # Parameters for neural network classifier 
@@ -120,7 +120,7 @@ for (k, (train_index, test_index)) in enumerate(CV.split(X,y)):
     y_test = torch.Tensor(y[test_index]) 
     
     print("####################OPTIMIZING HIDEN UNITS##########################") 
-    opt_val_err, n_hidden_units = ANN_validate(X_test,y_test,[3,4,5],cvf=5) 
+    opt_val_err, n_hidden_units = ANN_validate(X_test,y_test,[3,4,5,6,7],cvf=5) 
     h_unit.append(n_hidden_units) 
     opt_val_E.append(opt_val_err) 
     #print(n_hidden_units) 
@@ -232,13 +232,32 @@ Table[:,5] = Error_test_nofeatures[:,0]
 
 #%% Baseline vs rlr
 import seaborn as sns
+#plot zi's
+zdata={'Model': ['Baseline']*len(z_baseline)+['rlr']*len(z_rlr)+['ANN']*len(z_ANN),'Z': np.append(np.append(z_baseline,z_rlr),z_ANN)}
+zdf=pd.DataFrame(zdata)
+plt.figure(4)
+sns.boxplot(x='Model',y='Z', data=zdf)
 
-z = z_baseline - z_rlr
+#define zi's
+z = z_ANN - z_rlr
 
 confidence_level = 0.95
-degrees_freedom = z.size - 1
+df = z.size - 1
 sample_mean = np.mean(z)
 sample_standard_error = scipy.stats.sem(z)
 
-confidence_interval = scipy.stats.t.interval(confidence_level, degrees_freedom, sample_mean, sample_standard_error)
+CI = scipy.stats.t.interval(confidence_level, df, loc=sample_mean, scale=sample_standard_error)
+
+plt.figure(3)
 sns.histplot(z)
+pval = 2*scipy.stats.t.cdf(-abs(sample_mean),df,loc=0,scale=sample_standard_error)
+
+
+
+
+print(stats.ttest_rel(z_ANN, z_rlr))
+print(st.ttest_1samp(z,0))
+
+
+print('Confidence interval:', CI)
+print('p-value:', pval)
