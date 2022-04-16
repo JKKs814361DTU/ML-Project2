@@ -10,11 +10,11 @@ import numpy as np
  
 import torch 
 from sklearn import model_selection 
-from toolbox_02450 import train_neural_net, draw_neural_net,rlr_validate 
+from toolbox_02450 import train_neural_net, draw_neural_net,rlr_validate ,ttest_twomodels
 from scipy import stats 
 from data_prep import * 
 from project_lib import * 
-
+ 
 def plot_models(): 
      
     plt.figure(figsize=(10,10)) 
@@ -35,8 +35,8 @@ def plot_models():
     plt.show() 
 #%% 
 # Normalize data 
-mask_r= [0,1,3,5,7,8] 
-y = X[:,[2]] .astype(float) 
+mask_r= [1,2,4,5,6,7,8] 
+y = X[:,[0]] .astype(float) 
 X = X[:,mask_r].astype(float) 
 X_rlr = np.concatenate((np.ones((X.shape[0],1)),X),1)
 attributeNames_r = attributeNames[mask_r] 
@@ -48,7 +48,7 @@ X = stats.zscore(X)
 N, M = X.shape 
  
 # K-fold crossvalidation 
-K = 10                   # only three folds to speed up this example 
+K = 2                   # only three folds to speed up this example 
 CV = model_selection.KFold(K, shuffle=True) 
  
 # Parameters for neural network classifier 
@@ -80,9 +80,10 @@ Error_test_rlr = np.empty((K,1))
 Error_train_nofeatures = np.empty((K,1)) 
 Error_test_nofeatures = np.empty((K,1)) 
 Table = np.empty((K,6)) 
-z_baseline = np.array([])
-z_rlr = np.array([])
-z_ANN = np.array([])
+y_baseline = np.array([])
+y_rlr = np.array([])
+y_ANN = np.array([])
+y_True =np.array([])
 for (k, (train_index, test_index)) in enumerate(CV.split(X,y)):  
     print('\nCrossvalidation fold: {0}/{1}'.format(k+1,K))     
      
@@ -94,16 +95,17 @@ for (k, (train_index, test_index)) in enumerate(CV.split(X,y)):
     # Compute mean squared error without using the input data at all 
     Error_train_nofeatures[k] = np.square(y_train-y_train.mean()).sum(axis=0)/y_train.shape[0] 
     Error_test_nofeatures[k] = np.square(y_test-y_test.mean()).sum(axis=0)/y_test.shape[0] 
-    z_baseline= np.append(z_baseline, np.square(y_test-y_test.mean()))
+    y_baseline= np.append(y_baseline, np.ones(len(y_test))*y_test.mean())
+    y_True =np.append(y_True,y_test)
+    
     #################################Regularized linear reg################################## 
     X_train = (X_rlr[train_index,:])
     X_test_rlr = (X_rlr[test_index,:]) 
     opt_val_err_rlr, opt_lambda, mean_w_vs_lambda, train_err_vs_lambda, test_err_vs_lambda = rlr_validate(X_train, y_train, lambdas, K) 
-     
-    Table[:,3] = opt_lambda 
-    Table[:,4] = opt_val_err_rlr 
+    Table[k,3] = opt_lambda 
+    #Table[:,4] = opt_val_err_rlr 
     # Estimate weights for the optimal value of lambda, on entire training set 
-    lambdaI = opt_lambda * np.eye(M+1) 
+    lambdaI = opt_lambda * np.eye(M+1)
     lambdaI[0,0] = 0 # Do no regularize the bias term 
     Xty = X_train.T @ y_train 
     XtX = X_train.T @ X_train 
@@ -111,7 +113,7 @@ for (k, (train_index, test_index)) in enumerate(CV.split(X,y)):
     # Compute mean squared error with regularization with optimal lambda 
     Error_train_rlr[k] = np.square(y_train-X_train @ w_rlr[:,k]).sum(axis=0)/y_train.shape[0] 
     Error_test_rlr[k] = np.square(y_test-X_test_rlr @ w_rlr[:,k]).sum(axis=0)/y_test.shape[0] 
-    z_rlr = np.append(z_rlr,np.square(y_test-X_test_rlr @ w_rlr[:,k])) 
+    y_rlr = np.append(y_rlr,X_test_rlr @ w_rlr[:,k]) 
     ################################ANN########################################
     # Extract training and test set for current CV fold, convert to tensors 
     X_train = torch.Tensor(X[train_index,:]) 
@@ -120,9 +122,9 @@ for (k, (train_index, test_index)) in enumerate(CV.split(X,y)):
     y_test = torch.Tensor(y[test_index]) 
     
     print("####################OPTIMIZING HIDEN UNITS##########################") 
-    opt_val_err, n_hidden_units = ANN_validate(X_test,y_test,[3,4,5,6,7],cvf=K) 
+    opt_val_err, n_hidden_units = ANN_validate(X_test,y_test,[6,7,8,9,10],cvf=K) 
     h_unit.append(n_hidden_units) 
-    opt_val_E.append(opt_val_err) 
+    #opt_val_E.append(opt_val_err) 
     #print(n_hidden_units) 
     # Define the model 
     model = lambda: torch.nn.Sequential( 
@@ -148,10 +150,10 @@ for (k, (train_index, test_index)) in enumerate(CV.split(X,y)):
      
     # Determine errors and errors 
     se = (y_test_est.float()-y_test.float())**2 # squared error 
-    z_ANN = np.append(z_ANN,se.data.numpy())
+    y_ANN = np.append(y_ANN,y_test_est.data.numpy())
     mse = (sum(se).type(torch.float)/len(y_test)).data.numpy() #mean 
     errors.append(mse) # store error rate for current CV fold  
-     
+    opt_val_E.append(mse) 
     # Display the learning curve for the best net in the current fold 
     h, = summaries_axes[0].plot(learning_curve, color=color_list[k]) 
     h.set_label('CV fold {0}'.format(k+1)) 
@@ -225,7 +227,8 @@ summaries_axes[1].set_title('ANN')
  
 Table[:,0] = np.arange(K) 
 Table[:,1] = h_unit 
-Table[:,2] = opt_val_E 
+Table[:,2] = errors
+Table[:,4] = Error_test_rlr
 Table[:,5] = Error_test_nofeatures[:,0] 
  
 #############################Statistics#######################################
@@ -233,31 +236,11 @@ Table[:,5] = Error_test_nofeatures[:,0]
 #%% Baseline vs rlr
 import seaborn as sns
 #plot zi's
-zdata={'Model': ['Baseline']*len(z_baseline)+['rlr']*len(z_rlr)+['ANN']*len(z_ANN),'Z': np.append(np.append(z_baseline,z_rlr),z_ANN)}
+zdata={'Model': ['Baseline']*len(y_baseline)+['rlr']*len(y_rlr)+['ANN']*len(y_ANN),'Z': np.append(np.append(y_baseline,y_rlr),y_ANN)}
 zdf=pd.DataFrame(zdata)
 plt.figure(4)
 sns.boxplot(x='Model',y='Z', data=zdf)
 
-#define zi's
-z = z_rlr - z_baseline
-
-confidence_level = 0.95
-df = z.size - 1
-sample_mean = np.mean(z)
-sample_standard_error = scipy.stats.sem(z)
-
-CI = scipy.stats.t.interval(confidence_level, df, loc=sample_mean, scale=sample_standard_error)
-
-plt.figure(3)
-sns.histplot(z)
-pval = 2*scipy.stats.t.cdf(-abs(sample_mean),df,loc=0,scale=sample_standard_error)
-
-
-
-
-print(stats.ttest_rel(z_ANN, z_rlr))
-print(st.ttest_1samp(z,0))
-
-
-print('Confidence interval:', CI)
-print('p-value:', pval)
+print('Baseline vs rlr',ttest_twomodels(y_True, y_baseline, y_rlr, alpha=0.05, loss_norm_p=2))
+print('Baseline vs ANN',ttest_twomodels(y_True, y_baseline, y_ANN, alpha=0.05, loss_norm_p=2))
+print('ANN vs rlr',ttest_twomodels(y_True, y_ANN, y_rlr, alpha=0.05, loss_norm_p=2))
