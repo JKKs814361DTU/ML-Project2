@@ -12,7 +12,7 @@ import numpy as np
 import torch 
 from sklearn import model_selection
 from sklearn.linear_model import LogisticRegression 
-from toolbox_02450 import train_neural_net, rlr_validate 
+from toolbox_02450 import train_neural_net
 from scipy import stats 
 from data_prep import * 
 from project_lib import * 
@@ -33,7 +33,7 @@ X = stats.zscore(X)
 N, M = X.shape 
  
 # K-fold crossvalidation 
-K = 10                   # only three folds to speed up this example 
+K = 2                   # only three folds to speed up this example 
 CV = model_selection.KFold(K, shuffle=True) 
  
 # Parameters for neural network classifier 

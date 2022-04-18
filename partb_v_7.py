@@ -35,8 +35,8 @@ def plot_models():
     plt.show() 
 #%% 
 # Normalize data 
-mask_r= [1,2,4,5,6,7,8] 
-y = X[:,[0]] .astype(float) 
+mask_r= [0,1,3,4,5,6,7,8] 
+y = X[:,[2]] .astype(float) 
 X = X[:,mask_r].astype(float) 
 X_rlr = np.concatenate((np.ones((X.shape[0],1)),X),1)
 attributeNames_r = attributeNames[mask_r] 
@@ -128,7 +128,7 @@ for (k, (train_index, test_index)) in enumerate(CV.split(X,y)):
     
     print("####################OPTIMIZING HIDEN UNITS##########################")
     # find optimal value of hiden units
-    opt_val_err, n_hidden_units = ANN_validate(X_test,y_test,[5,6,7,8,9,10],cvf=K)
+    opt_val_err, n_hidden_units = ANN_validate(X_test,y_test,[2,3,4,5,6,7,8,9,10],cvf=K)
     h_unit.append(n_hidden_units) #update optimal number o units
     
     # Define the model 
