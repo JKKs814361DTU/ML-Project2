@@ -10,7 +10,9 @@ import numpy as np
 import seaborn as sns #function for plotting models
 
 import torch 
-from sklearn import model_selection 
+from sklearn import model_selection
+from sklearn.neural_network import MLPRegressor
+ 
 from toolbox_02450 import train_neural_net, draw_neural_net,rlr_validate ,ttest_twomodels
 from scipy import stats 
 from data_prep import * 
@@ -19,8 +21,8 @@ from project_lib import *
 def plot_models(): 
      
     plt.figure(figsize=(10,10)) 
-    y_rlr = X_test_rlr@ w_rlr[:,k]; y_true = y_test.data.numpy()[:,0] 
-    y_est = y_test_est.data.numpy(); 
+    y_rlr = X_test_rlr@ w_rlr[:,k]; y_true = y_test
+    y_est = y_test_est; 
     axis_range = [np.min([y_rlr, y_true])-1,np.max([y_rlr, y_true])+1] 
     plt.plot(axis_range,axis_range,'k--') 
     plt.plot(y_true, y_est,'og',alpha=.25) 
@@ -49,7 +51,7 @@ X = stats.zscore(X)
 N, M = X.shape 
  
 # K-fold crossvalidation 
-K = 2                   # only three folds to speed up this example 
+K = 10                   # only three folds to speed up this example 
 CV = model_selection.KFold(K, shuffle=True) 
  
 # Parameters for neural network classifier 
@@ -122,52 +124,27 @@ for (k, (train_index, test_index)) in enumerate(CV.split(X,y)):
     y_rlr = np.append(y_rlr,X_test_rlr @ w_rlr[:,k]) #rlr prediction test 
     ################################ANN########################################
     # Extract training and test set for current CV fold, convert to tensors 
-    X_train = torch.Tensor(X[train_index,:]) 
-    y_train = torch.Tensor(y[train_index]) 
-    X_test = torch.Tensor(X[test_index,:]) 
-    y_test = torch.Tensor(y[test_index]) 
+    X_train = (X[train_index,:])
     
     print("####################OPTIMIZING HIDEN UNITS##########################")
     # find optimal value of hiden units
-    opt_val_err, n_hidden_units = ANN_validate(X_test,y_test,range(1,10),cvf=K)
-    h_unit.append(n_hidden_units) #update optimal number o units
+    params = {'hidden_layer_sizes': range(1,10)}
     
-    # Define the model 
-    model = lambda: torch.nn.Sequential( 
-                        torch.nn.Linear(M, n_hidden_units), #M features to n_hidden_units 
-                        torch.nn.Tanh(),   # 1st transfer function, 
-                        torch.nn.Linear(n_hidden_units, n_hidden_units), #M features to n_hidden_units 
-                        torch.nn.Tanh(),   # 1st transfer function, 
-                        torch.nn.Linear(n_hidden_units, 1), # n_hidden_units to 1 output neuron 
-                        # no final tranfer function, i.e. "linear output" 
-                        ) 
-    print('\nCrossvalidation fold: {0}/{1}'.format(k+1,K))   
-    print('Training model of type:\n\n{}\n'.format(str(model()))) 
-    # Train the net on training data 
-    net, final_loss, learning_curve = train_neural_net(model, 
-                                                       loss_fn, 
-                                                       X=X_train, 
-                                                       y=y_train, 
-                                                       n_replicates=n_replicates, 
-                                                       max_iter=max_iter) 
-     
-    print('\n\tBest loss: {}\n'.format(final_loss)) 
-     
-    # Determine estimated class labels for test set 
-    y_test_est = net(X_test) 
-     
+    clf = model_selection.GridSearchCV(MLPRegressor(max_iter=20000), params, cv=K)
+    clf.fit(X_train, y_train)
+    Table[k,1] = clf.best_params_.get('hidden_layer_sizes')
+    y_test_est = clf.predict(X_test)
+    y_ANN = np.append(y_ANN,clf.predict(X_test))
+    
     # Determine errors and errors 
-    se = (y_test_est.float()-y_test.float())**2 # squared error 
-    y_ANN = np.append(y_ANN,y_test_est.data.numpy()) # ANN prediction
-    mse = (sum(se).type(torch.float)/len(y_test)).data.numpy() #mean 
+    se = (y_test_est-y_test)**2 # squared error 
+    y_ANN = np.append(y_ANN,y_test_est) # ANN prediction
+    mse = (sum(se)/len(y_test)) #mean 
     errors.append(mse) # store error rate for current CV fold  
-    # Display the learning curve for the best net in the current fold 
-    h, = summaries_axes[0].plot(learning_curve, color=color_list[k]) 
-    h.set_label('CV fold {0}'.format(k+1)) 
-    summaries_axes[0].set_xlabel('Iterations') 
-    summaries_axes[0].set_xlim((0, max_iter)) 
-    summaries_axes[0].set_ylabel('Loss') 
-    summaries_axes[0].set_title('Learning curves') 
+    
+    #find best parameters
+    print('Logistic Regression parameters: ', clf.best_params_) 
+     
      
     plot_models() 
      

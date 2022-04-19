@@ -8,23 +8,25 @@ Created on Sat Apr 16 12:34:31 2022
 # Regression, part b: 
 import matplotlib.pyplot as plt 
 import numpy as np 
- 
+import seaborn as sns
 import torch 
 from sklearn import model_selection
+from sklearn.tree import DecisionTreeClassifier
+
 from sklearn.linear_model import LogisticRegression 
-from toolbox_02450 import train_neural_net
+from toolbox_02450 import train_neural_net, rlr_validate 
 from scipy import stats 
 from data_prep import * 
 from project_lib import * 
 
 
 #%% 
-# Normalize data 
-mask_r= [0,1,2,3,4,5,6,7,8] 
+# Format data
+mask= [0,1,2,3,4,5,6,7,8] 
 y = np.uint8(y_CHD)
-X = X[:,mask_r].astype(float) 
+X = X[:,mask].astype(float) 
 X_rlr = np.concatenate((np.ones((X.shape[0],1)),X),1)
-attributeNames_r = attributeNames[mask_r] 
+attributeNames = attributeNames[mask] 
 #%%
  
 # Normalize data 
@@ -33,42 +35,24 @@ X = stats.zscore(X)
 N, M = X.shape 
  
 # K-fold crossvalidation 
-K = 2                   # only three folds to speed up this example 
+K = 10                   # only three folds to speed up this example 
 CV = model_selection.KFold(K, shuffle=True) 
- 
-# Parameters for neural network classifier 
-n_hidden_units = 5      # number of hidden units 
-n_replicates = 1        # number of networks trained in each k-fold 
-max_iter = 10000 
  
  
 # Parameters for rlr  
-#lambdas = np.power(10.,range(-5,9)) 
-lambdas = np.logspace(-8, 2, 50)
+ 
+lambdas = np.logspace(-3, 3, 20)
 w_rlr = np.empty((M+1,K)) 
  
+
+#Create used variables
  
- 
-# Setup figure for display of learning curves and error rates in fold 
-summaries, summaries_axes = plt.subplots(1,2, figsize=(10,5)) 
-# Make a list for storing assigned color of learning curve for up to K=10 
-color_list = ['tab:orange', 'tab:green', 'tab:purple', 'tab:brown', 'tab:pink', 
-              'tab:gray', 'tab:olive', 'tab:cyan', 'tab:red', 'tab:blue'] 
- 
-loss_fn = torch.nn.MSELoss() # notice how this is now a mean-squared-error loss 
- 
- 
-errors = [] # make a list for storing generalizaition error in each loop 
-h_unit = [] 
-opt_val_E = [] 
-Error_train_rlr = np.empty((K,1)) 
-Error_test_rlr = np.empty((K,1)) 
-Error_train_nofeatures = np.empty((K,1)) 
 Error_test_nofeatures = np.empty((K,1)) 
 Table = np.empty((K,6)) 
 y_baseline = np.array([])
 y_rlr = np.array([])
-y_ANN = np.array([])
+y_DTC = np.array([])
+y_True = np.array([])
 for (k, (train_index, test_index)) in enumerate(CV.split(X,y)):  
     print('\nCrossvalidation fold: {0}/{1}'.format(k+1,K))     
      
@@ -80,185 +64,63 @@ for (k, (train_index, test_index)) in enumerate(CV.split(X,y)):
     # Compute mean squared error without using the input data at all
     #mdl = LogisticRegression(penalty='l2', C=1e-16 )
     #mdl.fit(np.ones((len(y_train),1)), y_train)
-    y_test_est = round(np.sum(y_test)/len(y_test))*np.ones(len(y_train))#mdl.predict(np.ones((len(y_train),1))).T
+    y_test_est = round(np.sum(y_test)/len(y_test))*np.ones(len(y_test))#mdl.predict(np.ones((len(y_train),1))).T
     y_baseline= np.append(y_baseline, y_test_est)
+    y_True = np.append(y_True, y_test)
     #w_est = mdl.coef_[0]
-    Error_test_features[k] = np.sum(y_test_est != y_test) / len(y_test)
+    Error_test_nofeatures[k] = np.sum(y_test_est != y_test) / len(y_test)
     
     #################################Regularized logistic reg################################## 
-    
-    opt_val_err_rlogr, opt_lambda = rlogr_validate(X_train, y_train, lambdas, K) 
-     
-    Table[k,3] = opt_lambda 
-    
-    mdl = LogisticRegression(penalty='l2', C=1/opt_lambda )
-    
-    mdl.fit(X_train, y_train)
 
-    #y_train_est = mdl.predict(X_train).T
-    y_test_est = mdl.predict(X_test).T
     
-    #train_error_rate[k] = np.sum(y_train_est != y_train) / len(y_train)
-    #test_error_rate[k] = np.sum(y_test_est != y_test) / len(y_test)
-    Table[k,4]=np.sum(y_test_est != y_test) / len(y_test)
-    ################################ANN########################################
+    params = {'C': lambdas}
     
-    # Extract training and test set for current CV fold, convert to tensors 
-    X_train = torch.Tensor(X[train_index,:]) 
-    y_train = torch.Tensor(y[train_index]) 
-    X_test = torch.Tensor(X[test_index,:]) 
-    y_test = torch.Tensor(y[test_index]) 
+    clf = model_selection.GridSearchCV(LogisticRegression(), params, cv=K)
+    clf.fit(X_train, y_train)
+    Table[k,3] = clf.best_params_.get('C')
+    y_test_est = clf.predict(X_test)
+    y_rlr = np.append(y_rlr,clf.predict(X_test))
+    Table[k,4] = np.sum(y_test_est != y_test) / len(y_test)
     
-    print("####################OPTIMIZING HIDEN UNITS##########################") 
-    ##### NEEDS to use diffrent model and loss
-    opt_val_err, n_hidden_units = ANN_validate(X_test,y_test,[3,4,5,6,7],cvf=K )
-    Table[k,4] = n_hidden_units
-    # Define the model structure
-    
-    # The lambda-syntax defines an anonymous function, which is used here to 
-    # make it easy to make new networks within each cross validation fold
-    model = lambda: torch.nn.Sequential(
-                        torch.nn.Linear(M, n_hidden_units), #M features to H hiden units
-                        # 1st transfer function, either Tanh or ReLU:
-                        torch.nn.Tanh(),                            #torch.nn.ReLU(),
-                        torch.nn.Linear(n_hidden_units, 1), # H hidden units to 1 output neuron
-                        torch.nn.Sigmoid() # final tranfer function
-                        )
-    # Since we're training a neural network for binary classification, we use a 
-    # binary cross entropy loss (see the help(train_neural_net) for more on
-    # the loss_fn input to the function)
-    loss_fn = torch.nn.BCELoss()
-    
-    h_unit.append(n_hidden_units) 
+    #find best parameters
+    print('Logistic Regression parameters: ', clf.best_params_) # Now it displays all the parameters selected by the grid search
 
-    print('\nCrossvalidation fold: {0}/{1}'.format(k+1,K))   
-    print('Training model of type:\n\n{}\n'.format(str(model()))) 
-    # Train the net on training data 
-    net, final_loss, learning_curve = train_neural_net(model, 
-                                                       loss_fn, 
-                                                       X=X_train, 
-                                                       y=y_train, 
-                                                       n_replicates=n_replicates, 
-                                                       max_iter=max_iter) 
-     
-    print('\n\tBest loss: {}\n'.format(final_loss)) 
-     
-    # Determine estimated class labels for test set
-    y_sigmoid = net(X_test) # activation of final note, i.e. prediction of network
-    y_test_est = (y_sigmoid > .5).type(dtype=torch.uint8) # threshold output of sigmoidal function
-    y_test = y_test.type(dtype=torch.uint8)
-    # Determine errors and error rate
-    e = (y_test_est != y_test)
-    error_rate = (sum(e).type(torch.float)/len(y_test)).data.numpy()
-
-    Table[k,5] = error_rate # store error rate for current CV fold 
-     
-    # Display the learning curve for the best net in the current fold 
-    h, = summaries_axes[0].plot(learning_curve, color=color_list[k]) 
-    h.set_label('CV fold {0}'.format(k+1)) 
-    summaries_axes[0].set_xlabel('Iterations') 
-    summaries_axes[0].set_xlim((0, max_iter)) 
-    summaries_axes[0].set_ylabel('Loss') 
-    summaries_axes[0].set_title('Learning curves') 
-     
-    plot_models() 
-     
-     
-# Display the MSE across folds 
-summaries_axes[1].bar(np.arange(1, K+1), np.squeeze(np.asarray(errors)), color=color_list) 
-summaries_axes[1].set_xlabel('Fold') 
-summaries_axes[1].set_xticks(np.arange(1, K+1)) 
-summaries_axes[1].set_ylabel('MSE') 
-summaries_axes[1].set_title('Test mean-squared-error') 
-'''     
-print('Diagram of best neural net in last fold:') 
-weights = [net[i].weight.data.numpy().T for i in [0,2]] 
-biases = [net[i].bias.data.numpy() for i in [0,2]] 
-tf =  [str(net[i]) for i in [1,2]] 
-draw_neural_net(weights, biases, tf, attribute_names=attributeNames_r) 
-''' 
-# Print the average classification error rate 
-print('\nEstimated generalization error, RMSE: {0}'.format(round(np.sqrt(np.mean(errors)), 4))) 
- 
-# When dealing with regression outputs, a simple way of looking at the quality 
-# of predictions visually is by plotting the estimated value as a function of  
-# the true/known value - these values should all be along a straight line "y=x",  
-# and if the points are above the line, the model overestimates, whereas if the 
-# points are below the y=x line, then the model underestimates the value 
-plt.figure(figsize=(10,10)) 
-y_est = y_test_est.data.numpy(); y_true = y_test.data.numpy() 
-axis_range = [np.min([y_est, y_true])-1,np.max([y_est, y_true])+1] 
-plt.plot(axis_range,axis_range,'k--') 
-plt.plot(y_true, y_est,'ob',alpha=.25) 
-plt.legend(['Perfect estimation','Model estimations']) 
-plt.title('Alcohol content: estimated versus true value (for last CV-fold)') 
-plt.ylim(axis_range); plt.xlim(axis_range) 
-plt.xlabel('True value') 
-plt.ylabel('Estimated value') 
-plt.grid() 
- 
-plt.show() 
- 
-# Setup figure for display of learning curves and error rates in fold 
-summaries, summaries_axes = plt.subplots(1,2, figsize=(10,5)) 
- 
-# Display the Optimal units across folds 
-summaries_axes[0].bar(np.arange(1, K+1), np.squeeze(np.asarray(h_unit)), color=color_list) 
-summaries_axes[0].set_xlabel('Fold') 
-summaries_axes[0].set_xticks(np.arange(1, K+1)) 
-summaries_axes[0].set_ylabel('Optimal no of units') 
-summaries_axes[0].set_title('Optimal no of units') 
- 
-# Display the Optimal units across folds 
-summaries_axes[1].bar(np.arange(1, K+1), np.squeeze(np.asarray(opt_val_E)), color=color_list) 
-summaries_axes[1].set_xlabel('Fold') 
-summaries_axes[1].set_xticks(np.arange(1, K+1)) 
-summaries_axes[1].set_ylabel('Avg error for CV fold') 
-summaries_axes[1].set_title('ANN') 
- 
- 
- 
- 
+    ################################Decision Tree########################################
+    
+    # Fit regression tree classifier, Gini split criterion, no pruning
+    dtc = DecisionTreeClassifier(criterion='gini')
+    
+    parameters = {'max_depth':range(1,10)}
+    clf = model_selection.GridSearchCV(dtc, parameters,cv=K)
+    clf.fit(X_train,y_train)
+    Table[k,1] = clf.best_params_.get('max_depth')
+    y_test_est = clf.predict(X_test)
+    y_DTC = np.append(y_DTC,clf.predict(X_test))
+    Table[k,2] = np.sum(y_test_est != y_test) / len(y_test)
+    print('Decision Tree parameters: ', clf.best_params_) # Now it displays all the parameters selected by the grid search
  
  
 #############################Create the table################################# 
  
  
-Table[:,0] = np.arange(K) 
-Table[:,1] = h_unit 
-Table[:,2] = opt_val_E 
+Table[:,0] = np.arange(K)+1
+
 Table[:,5] = Error_test_nofeatures[:,0] 
- 
+Table = Table.round(decimals=3, out=None) 
 #############################Statistics#######################################
 
 #%% Baseline vs rlr
-import seaborn as sns
+
 #plot zi's
-zdata={'Model': ['Baseline']*len(z_baseline)+['rlr']*len(z_rlr)+['ANN']*len(z_ANN),'Z': np.append(np.append(z_baseline,z_rlr),z_ANN)}
+zdata={'Model': ['Baseline']*len(y_baseline)+['rlr']*len(y_rlr)+['ANN']*len(y_DTC),'Prediction avg': np.append(np.append(y_baseline,y_rlr),y_DTC)}
 zdf=pd.DataFrame(zdata)
 plt.figure(4)
-sns.boxplot(x='Model',y='Z', data=zdf)
-
-#define zi's
-z = z_ANN - z_rlr
-
-confidence_level = 0.95
-df = z.size - 1
-sample_mean = np.mean(z)
-sample_standard_error = scipy.stats.sem(z)
-
-CI = scipy.stats.t.interval(confidence_level, df, loc=sample_mean, scale=sample_standard_error)
-
-plt.figure(3)
-sns.histplot(z)
-pval = 2*scipy.stats.t.cdf(-abs(sample_mean),df,loc=0,scale=sample_standard_error)
-
-
-
-
-print(stats.ttest_rel(z_ANN, z_rlr))
-print(st.ttest_1samp(z,0))
-
-
-print('Confidence interval:', CI)
-print('p-value:', pval)
+sns.barplot(x='Model',y='Prediction avg', data=zdf)
+print('Baseline vs rlr')
+print(mcnemar(y_True, y_baseline, y_rlr, alpha=0.05))
+print('######################################')
+print('Baseline vs DTC')
+print(mcnemar(y_True, y_baseline, y_DTC, alpha=0.05))
+print('######################################')
+print('DTC vs rlr')
+print(mcnemar(y_True, y_DTC, y_rlr, alpha=0.05))
