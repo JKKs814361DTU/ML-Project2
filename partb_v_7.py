@@ -36,8 +36,8 @@ def plot_models():
     plt.show() 
 #%% 
 # Normalize data 
-mask_r= [0,1,3,4,5,6,7,8] 
-y = X[:,[2]] .astype(float) 
+mask_r= [0,1,2,4,5,6,7,8] 
+y = X[:,[3]] .astype(float) 
 X = X[:,mask_r].astype(float) 
 X_rlr = np.concatenate((np.ones((X.shape[0],1)),X),1)
 attributeNames_r = attributeNames[mask_r] 
@@ -49,7 +49,7 @@ X = stats.zscore(X)
 N, M = X.shape 
  
 # K-fold crossvalidation 
-K = 2                   # only three folds to speed up this example 
+K = 10                   # only three folds to speed up this example 
 CV = model_selection.KFold(K, shuffle=True) 
  
 # Parameters for neural network classifier 
@@ -214,7 +214,7 @@ summaries_axes[1].set_title('ANN')
 #############################Create the table################################# 
 #%%
  
-Table[:,0] = np.arange(K) 
+Table[:,0] = np.arange(K+1) 
 Table[:,1] = h_unit 
 Table[:,2] = errors
 Table[:,4] = Error_test_rlr[:,0]

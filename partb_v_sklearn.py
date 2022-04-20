@@ -38,8 +38,8 @@ def plot_models():
     plt.show() 
 #%% 
 # Normalize data 
-mask_r= [0,1,3,4,5,6,7,8] 
-y = X[:,[2]] .astype(float) 
+mask_r= [0,1,2,4,5,6,7,8] 
+y = X[:,[3]] .astype(float) 
 X = X[:,mask_r].astype(float) 
 X_rlr = np.concatenate((np.ones((X.shape[0],1)),X),1)
 attributeNames_r = attributeNames[mask_r] 
@@ -51,7 +51,7 @@ X = stats.zscore(X)
 N, M = X.shape 
  
 # K-fold crossvalidation 
-K = 10                   # only three folds to speed up this example 
+K = 2                   # only three folds to speed up this example 
 CV = model_selection.KFold(K, shuffle=True) 
  
 # Parameters for neural network classifier 
@@ -130,7 +130,7 @@ for (k, (train_index, test_index)) in enumerate(CV.split(X,y)):
     # find optimal value of hiden units
     params = {'hidden_layer_sizes': range(1,10)}
     
-    clf = model_selection.GridSearchCV(MLPRegressor(max_iter=20000), params, cv=K)
+    clf = model_selection.GridSearchCV(MLPRegressor(max_iter=50000), params, cv=K)
     clf.fit(X_train, y_train)
     Table[k,1] = clf.best_params_.get('hidden_layer_sizes')
     y_test_est = clf.predict(X_test)
@@ -169,20 +169,6 @@ print('\nEstimated generalization error, RMSE: {0}'.format(round(np.sqrt(np.mean
 # Setup figure for display of learning curves and error rates in fold 
 summaries, summaries_axes = plt.subplots(1,2, figsize=(10,5)) 
  
-# Display the Optimal units across folds 
-summaries_axes[0].bar(np.arange(1, K+1), np.squeeze(np.asarray(h_unit)), color=color_list) 
-summaries_axes[0].set_xlabel('Fold') 
-summaries_axes[0].set_xticks(np.arange(1, K+1)) 
-summaries_axes[0].set_ylabel('Optimal no of units') 
-summaries_axes[0].set_title('Optimal no of units') 
- 
-# Display the Optimal units across folds 
-summaries_axes[1].bar(np.arange(1, K+1), np.squeeze(np.asarray(errors)), color=color_list) 
-summaries_axes[1].set_xlabel('Fold') 
-summaries_axes[1].set_xticks(np.arange(1, K+1)) 
-summaries_axes[1].set_ylabel('Avg error for CV fold') 
-summaries_axes[1].set_title('ANN') 
- 
  
  
  
@@ -192,7 +178,6 @@ summaries_axes[1].set_title('ANN')
 #%%
  
 Table[:,0] = np.arange(K) 
-Table[:,1] = h_unit 
 Table[:,2] = errors
 Table[:,4] = Error_test_rlr[:,0]
 Table[:,5] = Error_test_nofeatures[:,0] 
