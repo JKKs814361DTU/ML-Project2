@@ -27,7 +27,7 @@ def plot_models():
     plt.plot(y_true, y_rlr,'ob',alpha=.25) 
     plt.plot(y_true, y_true.mean()*np.ones(len(y_true)),'or',alpha=.25) 
     plt.legend(['Perfect estimation','ANN','rlr','baseline']) 
-    plt.title('Cross-validation fold'+str(k+1)) 
+    plt.title('Cross-validation fold k='+str(k+1)) 
     plt.ylim(axis_range); plt.xlim(axis_range) 
     plt.xlabel('True value') 
     plt.ylabel('Estimated value') 
@@ -39,17 +39,17 @@ def plot_models():
 mask_r= [0,1,2,4,5,6,7,8] 
 y = X[:,[3]] .astype(float) 
 X = X[:,mask_r].astype(float) 
-X_rlr = np.concatenate((np.ones((X.shape[0],1)),X),1)
+
 attributeNames_r = attributeNames[mask_r] 
 #%%
  
 # Normalize data 
 X = stats.zscore(X) 
-                 
+X_rlr = np.concatenate((np.ones((X.shape[0],1)),X),1)               
 N, M = X.shape 
  
 # K-fold crossvalidation 
-K = 10                   # only three folds to speed up this example 
+K = 2                   # only three folds to speed up this example 
 CV = model_selection.KFold(K, shuffle=True) 
  
 # Parameters for neural network classifier 
@@ -120,6 +120,25 @@ for (k, (train_index, test_index)) in enumerate(CV.split(X,y)):
     Error_train_rlr[k] = np.square(y_train-X_train @ w_rlr[:,k]).sum(axis=0)/y_train.shape[0] 
     Error_test_rlr[k] = np.square(y_test-X_test_rlr @ w_rlr[:,k]).sum(axis=0)/y_test.shape[0] 
     y_rlr = np.append(y_rlr,X_test_rlr @ w_rlr[:,k]) #rlr prediction test 
+    
+    ###
+    plt.figure(k, figsize=(12,8))
+    plt.subplot(1,2,1)
+    plt.semilogx(lambdas,mean_w_vs_lambda.T[:,1:],'.-') # Don't plot the bias term
+    plt.xlabel('Regularization factor')
+    plt.ylabel('Mean Coefficient Values')
+    plt.grid()
+    # You can choose to display the legend, but it's omitted for a cleaner 
+    # plot, since there are many attributes
+    #legend(attributeNames[1:], loc='best')
+    
+    plt.subplot(1,2,2)
+    plt.title('Optimal lambda: 1e{0}'.format(np.log10(opt_lambda)))
+    plt.loglog(lambdas,train_err_vs_lambda.T,'b.-',lambdas,test_err_vs_lambda.T,'r.-')
+    plt.xlabel('Regularization factor')
+    plt.ylabel('Squared error (crossvalidation)')
+    plt.legend(['Train error','Validation error'])
+    plt.grid()
     ################################ANN########################################
     # Extract training and test set for current CV fold, convert to tensors 
     X_train = torch.Tensor(X[train_index,:]) 
@@ -129,15 +148,15 @@ for (k, (train_index, test_index)) in enumerate(CV.split(X,y)):
     
     print("####################OPTIMIZING HIDEN UNITS##########################")
     # find optimal value of hiden units
-    opt_val_err, n_hidden_units = ANN_validate(X_test,y_test,range(1,10),cvf=K)
+    opt_val_err, n_hidden_units = ANN_validate(X_test,y_test,range(1,2),cvf=K)
     h_unit.append(n_hidden_units) #update optimal number o units
     
     # Define the model 
     model = lambda: torch.nn.Sequential( 
                         torch.nn.Linear(M, n_hidden_units), #M features to n_hidden_units 
                         torch.nn.Tanh(),   # 1st transfer function, 
-                        torch.nn.Linear(n_hidden_units, n_hidden_units), #M features to n_hidden_units 
-                        torch.nn.Tanh(),   # 1st transfer function, 
+                        #torch.nn.Linear(n_hidden_units, n_hidden_units), #M features to n_hidden_units 
+                        #torch.nn.Tanh(),   # 1st transfer function, 
                         torch.nn.Linear(n_hidden_units, 1), # n_hidden_units to 1 output neuron 
                         # no final tranfer function, i.e. "linear output" 
                         ) 
@@ -169,7 +188,7 @@ for (k, (train_index, test_index)) in enumerate(CV.split(X,y)):
     summaries_axes[0].set_ylabel('Loss') 
     summaries_axes[0].set_title('Learning curves') 
      
-    plot_models() 
+    #plot_models() 
      
      
 # Display the MSE across folds 
@@ -214,12 +233,46 @@ summaries_axes[1].set_title('ANN')
 #############################Create the table################################# 
 #%%
  
-Table[:,0] = np.arange(K+1) 
+Table[:,0] = np.arange(K)+1 
 Table[:,1] = h_unit 
 Table[:,2] = errors
 Table[:,4] = Error_test_rlr[:,0]
 Table[:,5] = Error_test_nofeatures[:,0] 
- 
+#%%
+import os
+Table = Table.round(decimals=3, out=None) 
+df2 = pd.DataFrame(Table,columns=['k', 'h', 'E_ANN','lambda','E_rlr','E_base'])
+cwd = os.getcwd()
+path = cwd + "/part_b_result.csv"
+df2.to_csv("part_b_result.csv",index = False)
+df3 = pd.DataFrame(np.stack((y_True, y_baseline, y_ANN, y_rlr),axis=-1),columns=['y_true', 'y_baseline', 'y_ANN','y_rlr'])
+df3.to_csv("part_b_prediction.csv")
+# Display the learning curve for the best net in the current fold 
+h, = summaries_axes[0].plot(learning_curve, color=color_list[k]) 
+h.set_label('CV fold {0}'.format(k+1)) 
+summaries_axes[0].set_xlabel('Iterations') 
+summaries_axes[0].set_xlim((0, max_iter)) 
+summaries_axes[0].set_ylabel('Loss') 
+summaries_axes[0].set_title('Learning curves') 
+
+#All test plot
+
+plt.figure(figsize=(10,10)) 
+
+axis_range = [np.min([y_rlr, y_True])-1,np.max([y_rlr, y_True])+1] 
+plt.plot(axis_range,axis_range,'k--') 
+plt.plot(y_True, y_ANN,'og',alpha=.5) 
+plt.plot(y_True, y_rlr,'+b',alpha=.5) 
+plt.plot(y_True, y_True.mean()*np.ones(len(y_True)),'*r',alpha=.5) 
+plt.legend(['Perfect estimation','ANN','rlr','baseline']) 
+plt.title('All CV-folds') 
+plt.ylim(axis_range); plt.xlim(axis_range) 
+plt.xlabel('True value') 
+plt.ylabel('Estimated value') 
+plt.grid() 
+plt.savefig('all_test_partb.pdf') 
+plt.show() 
+
 #############################Statistics#######################################
 
 #%% Baseline vs rlr

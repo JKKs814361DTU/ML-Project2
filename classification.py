@@ -25,13 +25,13 @@ from project_lib import *
 mask= [0,1,2,3,4,5,6,7,8] 
 y = np.uint8(y_CHD)
 X = X[:,mask].astype(float) 
-X_rlr = np.concatenate((np.ones((X.shape[0],1)),X),1)
 attributeNames = attributeNames[mask] 
 #%%
  
 # Normalize data 
 X = stats.zscore(X) 
-                 
+X_rlr = np.concatenate((np.ones((X.shape[0],1)),X),1)
+      
 N, M = X.shape 
  
 # K-fold crossvalidation 
@@ -107,12 +107,20 @@ Table[:,0] = np.arange(K)+1
 
 Table[:,5] = Error_test_nofeatures[:,0] 
 Table = Table.round(decimals=3, out=None) 
+
+Table = Table.round(decimals=3, out=None) 
+#%%
+df2 = pd.DataFrame(Table,columns=['k', 'depth', 'E_DTC','lambda','E_log','E_base'])
+df2.to_csv("classifiaction.csv")
+
+df3 = pd.DataFrame(np.stack((y_True, y_baseline, y_DTC, y_rlr),axis=-1),columns=['y_true', 'y_baseline', 'y_DTC','y_rlr'])
+df2.to_csv("class_prediction.csv")
 #############################Statistics#######################################
 
 #%% Baseline vs rlr
 
 #plot zi's
-zdata={'Model': ['Baseline']*len(y_baseline)+['rlr']*len(y_rlr)+['ANN']*len(y_DTC),'Prediction avg': np.append(np.append(y_baseline,y_rlr),y_DTC)}
+zdata={'Model': ['Baseline']*len(y_baseline)+['rlr']*len(y_rlr)+['DTC']*len(y_DTC),'Prediction avg': np.append(np.append(y_baseline,y_rlr),y_DTC)}
 zdf=pd.DataFrame(zdata)
 plt.figure(4)
 sns.barplot(x='Model',y='Prediction avg', data=zdf)
