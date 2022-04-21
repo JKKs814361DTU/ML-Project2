@@ -49,7 +49,7 @@ X_rlr = np.concatenate((np.ones((X.shape[0],1)),X),1)
 N, M = X.shape 
  
 # K-fold crossvalidation 
-K = 2                   # only three folds to speed up this example 
+K = 10                   # only three folds to speed up this example 
 CV = model_selection.KFold(K, shuffle=True) 
  
 # Parameters for neural network classifier 
@@ -59,7 +59,9 @@ max_iter = 30000
  
  
 # Parameters for rlr  
-lambdas = np.power(10.,range(-5,9)) 
+#lambdas = np.power(10.,range(-5,9))
+lambdas = range(0,100) 
+
 w_rlr = np.empty((M+1,K)) 
  
  
@@ -85,6 +87,8 @@ y_baseline = np.array([])
 y_rlr = np.array([])
 y_ANN = np.array([])
 y_True =np.array([])
+
+#%%
 for (k, (train_index, test_index)) in enumerate(CV.split(X,y)):  
     print('\nCrossvalidation fold: {0}/{1}'.format(k+1,K))     
      
@@ -148,15 +152,13 @@ for (k, (train_index, test_index)) in enumerate(CV.split(X,y)):
     
     print("####################OPTIMIZING HIDEN UNITS##########################")
     # find optimal value of hiden units
-    opt_val_err, n_hidden_units = ANN_validate(X_test,y_test,range(1,2),cvf=K)
+    opt_val_err, n_hidden_units = ANN_validate(X_test,y_test,range(1,10),cvf=K)
     h_unit.append(n_hidden_units) #update optimal number o units
     
     # Define the model 
     model = lambda: torch.nn.Sequential( 
                         torch.nn.Linear(M, n_hidden_units), #M features to n_hidden_units 
-                        torch.nn.Tanh(),   # 1st transfer function, 
-                        #torch.nn.Linear(n_hidden_units, n_hidden_units), #M features to n_hidden_units 
-                        #torch.nn.Tanh(),   # 1st transfer function, 
+                        torch.nn.ReLU(),#torch.nn.Tanh(),   # 1st transfer function, 
                         torch.nn.Linear(n_hidden_units, 1), # n_hidden_units to 1 output neuron 
                         # no final tranfer function, i.e. "linear output" 
                         ) 
@@ -246,7 +248,7 @@ cwd = os.getcwd()
 path = cwd + "/part_b_result.csv"
 df2.to_csv("part_b_result.csv",index = False)
 df3 = pd.DataFrame(np.stack((y_True, y_baseline, y_ANN, y_rlr),axis=-1),columns=['y_true', 'y_baseline', 'y_ANN','y_rlr'])
-df3.to_csv("part_b_prediction.csv")
+df3.to_csv("part_b_prediction.csv",index = False)
 # Display the learning curve for the best net in the current fold 
 h, = summaries_axes[0].plot(learning_curve, color=color_list[k]) 
 h.set_label('CV fold {0}'.format(k+1)) 
@@ -285,3 +287,4 @@ sns.boxplot(x='Model',y='Z', data=zdf)
 print('Baseline vs rlr',ttest_twomodels(y_True, y_baseline, y_rlr, alpha=0.05, loss_norm_p=2))
 print('Baseline vs ANN',ttest_twomodels(y_True, y_baseline, y_ANN, alpha=0.05, loss_norm_p=2))
 print('ANN vs rlr',ttest_twomodels(y_True, y_ANN, y_rlr, alpha=0.05, loss_norm_p=2))
+print('ANN vs rlr',ttest_twomodels(y_True, y_rlr, y_ANN, alpha=0.05, loss_norm_p=2))

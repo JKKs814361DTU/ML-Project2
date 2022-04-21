@@ -49,8 +49,8 @@ max_iter = 30000
 k=0 
 K=1
 # Parameters for rlr  
-#lambdas = np.power(10.,range(-5,9)) 
-lambdas = np.logspace(-1, 3, 50)
+lambdas = np.power(10.,range(-5,9)) 
+#lambdas = np.logspace(-1, 3, 50)
 
 w = np.empty((M,K)) 
  
@@ -107,7 +107,7 @@ plt.ylabel('Mean Coefficient Values')
 plt.grid()
 # You can choose to display the legend, but it's omitted for a cleaner 
 # plot, since there are many attributes
-#legend(attributeNames[1:], loc='best')
+plt.legend(attributeNames_r[1:], loc='best')
 
 plt.subplot(1,2,2)
 plt.title('Optimal lambda: 1e{0}'.format(np.log10(opt_lambda)))
@@ -116,3 +116,4 @@ plt.xlabel('Regularization factor')
 plt.ylabel('Squared error (crossvalidation)')
 plt.legend(['Train error','Validation error'])
 plt.grid()
+plt.savefig('part_A.pdf')

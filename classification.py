@@ -13,7 +13,7 @@ import torch
 from sklearn import model_selection
 from sklearn.tree import DecisionTreeClassifier
 
-from sklearn.linear_model import LogisticRegression 
+from sklearn.linear_model import LogisticRegression, LogisticRegressionCV 
 from toolbox_02450 import train_neural_net, rlr_validate 
 from scipy import stats 
 from data_prep import * 
@@ -41,7 +41,7 @@ CV = model_selection.KFold(K, shuffle=True)
  
 # Parameters for rlr  
  
-lambdas = np.logspace(-3, 3, 20)
+lambdas = np.logspace(-5, 5, 11) #np.logspace(-3, 3, 20)
 w_rlr = np.empty((M+1,K)) 
  
 
@@ -53,6 +53,8 @@ y_baseline = np.array([])
 y_rlr = np.array([])
 y_DTC = np.array([])
 y_True = np.array([])
+w_est = np.array([])
+aN= np.array([])
 for (k, (train_index, test_index)) in enumerate(CV.split(X,y)):  
     print('\nCrossvalidation fold: {0}/{1}'.format(k+1,K))     
      
@@ -82,6 +84,11 @@ for (k, (train_index, test_index)) in enumerate(CV.split(X,y)):
     y_rlr = np.append(y_rlr,clf.predict(X_test))
     Table[k,4] = np.sum(y_test_est != y_test) / len(y_test)
     
+    mdl=LogisticRegression(penalty='l2', C=1/10 )
+
+    mdl.fit(X_train, y_train)
+    w_est = np.append(w_est,mdl.coef_[0]) 
+    aN = np.append(aN,attributeNames)
     #find best parameters
     print('Logistic Regression parameters: ', clf.best_params_) # Now it displays all the parameters selected by the grid search
 
@@ -98,7 +105,7 @@ for (k, (train_index, test_index)) in enumerate(CV.split(X,y)):
     y_DTC = np.append(y_DTC,clf.predict(X_test))
     Table[k,2] = np.sum(y_test_est != y_test) / len(y_test)
     print('Decision Tree parameters: ', clf.best_params_) # Now it displays all the parameters selected by the grid search
- 
+
  
 #############################Create the table################################# 
  
@@ -114,7 +121,7 @@ df2 = pd.DataFrame(Table,columns=['k', 'depth', 'E_DTC','lambda','E_log','E_base
 df2.to_csv("classifiaction.csv")
 
 df3 = pd.DataFrame(np.stack((y_True, y_baseline, y_DTC, y_rlr),axis=-1),columns=['y_true', 'y_baseline', 'y_DTC','y_rlr'])
-df2.to_csv("class_prediction.csv")
+df3.to_csv("class_prediction.csv")
 #############################Statistics#######################################
 
 #%% Baseline vs rlr
@@ -132,3 +139,35 @@ print(mcnemar(y_True, y_baseline, y_DTC, alpha=0.05))
 print('######################################')
 print('DTC vs rlr')
 print(mcnemar(y_True, y_DTC, y_rlr, alpha=0.05))
+
+
+########################################Q5############################################
+#%%
+'''
+mdl=LogisticRegression(penalty='l2', C=1/10 )
+
+mdl.fit(X_train, y_train)
+
+y_train_est = mdl.predict(X_train).T
+y_test_est = mdl.predict(X_test).T
+
+train_error_rate = np.sum(y_train_est != y_train) / len(y_train)
+test_error_rate = np.sum(y_test_est != y_test) / len(y_test)
+
+#w_est = mdl.coef_[0] 
+coefficient_norm = np.sqrt(np.sum(w_est**2))
+
+wdata={'Attribute': attributeNames.tolist(), 'weight': w_est}
+zdf=pd.DataFrame(zdata)
+plt.figure(4,figsize=(10,5))
+plt.barh(attributeNames,w_est)
+plt.xlabel('Attribte weight')
+plt.savefig('weights_logistics.pdf')
+'''
+#%%
+plt.figure(4,figsize=(10,5))
+wdata={'Attributes': aN.tolist(),'weights': w_est}
+wdf=pd.DataFrame(wdata)
+plt.figure(4)
+sns.barplot(x='Attributes',y='weights', data=wdf)
+plt.savefig('weights_logistics.pdf')

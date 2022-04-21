@@ -41,17 +41,17 @@ def plot_models():
 mask_r= [0,1,2,4,5,6,7,8] 
 y = X[:,[3]] .astype(float) 
 X = X[:,mask_r].astype(float) 
-X_rlr = np.concatenate((np.ones((X.shape[0],1)),X),1)
+
 attributeNames_r = attributeNames[mask_r] 
 #%%
  
 # Normalize data 
 X = stats.zscore(X) 
-                 
+X_rlr = np.concatenate((np.ones((X.shape[0],1)),X),1)               
 N, M = X.shape 
  
 # K-fold crossvalidation 
-K = 2                   # only three folds to speed up this example 
+K = 10                   # only three folds to speed up this example 
 CV = model_selection.KFold(K, shuffle=True) 
  
 # Parameters for neural network classifier 
@@ -170,7 +170,23 @@ print('\nEstimated generalization error, RMSE: {0}'.format(round(np.sqrt(np.mean
 summaries, summaries_axes = plt.subplots(1,2, figsize=(10,5)) 
  
  
- 
+#All test plot
+
+plt.figure(figsize=(10,10)) 
+
+axis_range = [np.min([y_rlr, y_True])-1,np.max([y_rlr, y_True])+1] 
+plt.plot(axis_range,axis_range,'k--') 
+plt.plot(y_True, y_ANN,'og',alpha=.5) 
+plt.plot(y_True, y_rlr,'+b',alpha=.5) 
+plt.plot(y_True, y_True.mean()*np.ones(len(y_True)),'*r',alpha=.5) 
+plt.legend(['Perfect estimation','ANN','rlr','baseline']) 
+plt.title('All CV-folds') 
+plt.ylim(axis_range); plt.xlim(axis_range) 
+plt.xlabel('True value') 
+plt.ylabel('Estimated value') 
+plt.grid() 
+plt.savefig('all_test_partb.pdf') 
+plt.show()  
  
  
  

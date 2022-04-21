@@ -63,15 +63,13 @@ def ANN_validate(X,y,h_list,cvf=10):
             # Define the model
             model = lambda: torch.nn.Sequential(
                                 torch.nn.Linear(M, n_hidden_units), #M features to n_hidden_units
-                                torch.nn.Tanh(),   # 1st transfer function,
-                                #torch.nn.Linear(n_hidden_units, n_hidden_units), #M features to n_hidden_units 
-                                #torch.nn.Tanh(),   # 1st transfer function, 
+                                torch.nn.ReLU(),#torch.nn.Tanh(),   # 1st transfer function,
                                 torch.nn.Linear(n_hidden_units, 1), # n_hidden_units to 1 output neuron
                                 # no final tranfer function, i.e. "linear output"
                                 )
             loss_fn = torch.nn.MSELoss() # notice how this is now a mean-squared-error loss
     
-            #print('Training model of type:\n\n{}\n'.format(str(model())))
+            print('Training model of type:\n\n{}\n'.format(str(model())))
             
 
                
